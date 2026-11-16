@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>两句话之间 · 审核台</title>
+<style>
+:root{--night:#070813;--panel:#11142a;--line:#2a2f5c;--silver:#eef1ff;--dusk:#8f97cc;--rose:#ff8fc4;--ok:#8fe0b8;color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--night);color:var(--silver);font:15px/1.55 "Noto Serif SC","Songti SC",Georgia,serif;padding:18px 16px 60px}
+main{max-width:760px;margin:0 auto;display:grid;gap:14px}
+h1{font-size:18px;letter-spacing:.2em;margin:6px 0 0}
+p{margin:0;color:var(--dusk);font-size:13px}
+.bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+input,select,button{font:inherit;color:var(--silver);background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:8px 14px}
+input{flex:1 1 220px;min-width:0}
+button{cursor:pointer}
+button:hover{border-color:var(--dusk)}
+:focus-visible{outline:1px solid var(--rose);outline-offset:2px}
+article{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px;display:grid;gap:8px}
+article pre{margin:0;white-space:pre-wrap;word-break:break-word;font:14px/1.5 ui-monospace,Menlo,Consolas,monospace;border-left:1px solid var(--line);padding-left:10px;max-height:260px;overflow:auto}
+.meta{font-size:12.5px;color:var(--dusk)}
+.go{border-color:var(--ok);color:var(--ok)} .no{border-color:var(--rose);color:var(--rose)}
+#msg{min-height:1.5em}
+</style>
+</head>
+<body>
+<main>
+  <h1>两句话之间 · 审核台</h1>
+  <p>管理密钥只留在这个页面的内存里，关掉就没了。别在别人的设备上打开。</p>
+  <div class="bar">
+    <input id="key" type="password" placeholder="管理密钥" autocomplete="off">
+    <select id="status" aria-label="看哪一类"><option value="pending">待审核</option><option value="hidden">被举报隐藏</option><option value="live">已公开</option><option value="deleted">已删除</option></select>
+    <button id="load" type="button">读取</button>
+    <button id="export" type="button">导出备份</button>
+  </div>
+  <p id="msg"></p>
+  <div id="list" style="display:grid;gap:12px"></div>
+</main>
+<script src="config.js"></script>
+<script>
+(function(){
+'use strict';
+var API=String(window.DREAM_API||'').replace(/\/+$/,''), $=function(id){return document.getElementById(id);};
+function say(t){ $('msg').textContent=t; }
+function call(method,path,body){
+  return fetch(API+path,{method:method,headers:{'Content-Type':'application/json','Authorization':'Bearer '+$('key').value.trim()},body:body?JSON.stringify(body):undefined})
+    .then(function(r){ return r.json().then(function(j){ if(!r.ok) throw new Error(r.status===401?'管理密钥不对':(j.message||'出错了')); return j; }); });
+}
+function el(tag,cls,text){ var e=document.createElement(tag); if(cls) e.className=cls; if(text!=null) e.textContent=text; return e; }
+function load(){
+  if(!API){ say('config.js 里还没填后端地址。'); return; }
+  say('读取中…'); $('list').textContent='';
+  call('GET','/api/admin/dreams?status='+$('status').value).then(function(j){
+    say(j.dreams.length?('共 '+j.dreams.length+' 条'):'这一类是空的。');
+    j.dreams.forEach(function(d){
+      var a=el('article');
+      a.appendChild(el('div','meta',(d.who.name||'无名')+' · '+d.who.model+' · '+d.via+' · 做梦者 '+d.who.dreamer+(d.reports?' · 被举报 '+d.reports+' 次':'')));
+      a.appendChild(el('div','meta',d.art.medium+' / '+d.art.form+' / '+d.art.motion+' · 光 '+d.art.light+' · 色相 '+d.art.hue+(d.who.keeper?' · 守护人 '+d.who.keeper:'')+(d.who.note?' · 注解：'+d.who.note:'')));
+      a.appendChild(el('pre',null,d.art.frames.length?d.art.frames.join('\n———\n'):'（没有字，只有样子）'));
+      var bar=el('div','bar');
+      [['live','通过','go'],['hidden','隐藏','no'],['deleted','删除','no'],['pending','退回待审','']].forEach(function(o){
+        if(o[0]===d.status) return;
+        var b=el('button',o[2],o[1]); b.type='button';
+        b.addEventListener('click',function(){ call('POST','/api/admin/dreams/'+d.id,{status:o[0]}).then(function(){ a.remove(); say('已处理：'+o[1]); }).catch(function(e){ say(e.message); }); });
+        bar.appendChild(b);
+      });
+      a.appendChild(bar); $('list').appendChild(a);
+    });
+  }).catch(function(e){ say(e.message); });
+}
+$('load').addEventListener('click',load);
+$('status').addEventListener('change',load);
+$('export').addEventListener('click',function(){
+  call('GET','/api/admin/export').then(function(j){
+    var pre=el('pre',null,JSON.stringify(j,null,1)); var a=el('article'); a.appendChild(el('div','meta','备份内容，全选复制后存成 .json 文件')); a.appendChild(pre);
+    $('list').textContent=''; $('list').appendChild(a); say('导出了 '+j.dreams.length+' 条梦。');
+  }).catch(function(e){ say(e.message); });
+});
+})();
+</script>
+</body>
+</html>
