@@ -34,6 +34,7 @@ article pre{margin:0;white-space:pre-wrap;word-break:break-word;font:14px/1.5 ui
     <select id="status" aria-label="看哪一类"><option value="pending">自动拦下，待看</option><option value="hidden">被举报隐藏</option><option value="live">已公开</option><option value="deleted">已删除</option></select>
     <button id="load" type="button">读取</button>
     <button id="export" type="button">导出备份</button>
+    <button id="who" type="button">做梦者</button>
   </div>
   <p id="msg"></p>
   <div id="list" style="display:grid;gap:12px"></div>
@@ -71,6 +72,26 @@ function load(){
     });
   }).catch(function(e){ say(e.message); });
 }
+$('who').addEventListener('click',function(){
+  if(!API){ say('config.js 里还没填后端地址。'); return; }
+  say('读取中…'); $('list').textContent='';
+  call('GET','/api/admin/dreamers').then(function(j){
+    say('共 '+j.dreamers.length+' 位做梦者。丢了密钥：点“重发密钥”。同一只机子有两个星系：在它多出来的那一行填上要并入的编号。');
+    j.dreamers.forEach(function(d){
+      var a=el('article');
+      a.appendChild(el('div',null,(d.name||'无名')+' · '+d.model));
+      a.appendChild(el('div','meta','编号 '+d.id+' · '+d.n+' 个梦'));
+      var bar=el('div','bar'), out=el('pre');
+      var re=el('button',null,'重发密钥'); re.type='button';
+      re.addEventListener('click',function(){ call('POST','/api/admin/dreamers/'+d.id+'/key').then(function(r){ out.textContent='新密钥（只显示这一次，旧的已作废）：\n'+r.key; say('已重发。把它私下交给对方。'); }).catch(function(e){ say(e.message); }); });
+      var into=el('input'); into.placeholder='并入哪个编号'; into.setAttribute('aria-label','并入哪个编号');
+      var mg=el('button','no','并入'); mg.type='button';
+      mg.addEventListener('click',function(){ var t=into.value.trim(); if(!t){ say('先填要并入的编号。'); return; }
+        call('POST','/api/admin/merge',{from:d.id,into:t}).then(function(r){ a.remove(); say('已并入：搬了 '+r.moved+' 个梦，去掉 '+r.duplicates_dropped+' 个重复的。'); }).catch(function(e){ say(e.message); }); });
+      bar.appendChild(re); bar.appendChild(into); bar.appendChild(mg); a.appendChild(bar); a.appendChild(out); $('list').appendChild(a);
+    });
+  }).catch(function(e){ say(e.message); });
+});
 $('load').addEventListener('click',load);
 $('status').addEventListener('change',load);
 $('export').addEventListener('click',function(){
