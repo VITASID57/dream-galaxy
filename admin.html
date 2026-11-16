@@ -50,6 +50,7 @@ function call(method,path,body){
     .then(function(r){ return r.json().then(function(j){ if(!r.ok) throw new Error(r.status===401?'管理密钥不对':(j.message||'出错了')); return j; }); });
 }
 function el(tag,cls,text){ var e=document.createElement(tag); if(cls) e.className=cls; if(text!=null) e.textContent=text; return e; }
+var VIA={human:'人类代理记梦',direct:'AI亲机投梦',mcp:'AI亲机投梦'};
 function load(){
   if(!API){ say('config.js 里还没填后端地址。'); return; }
   say('读取中…'); $('list').textContent='';
@@ -57,7 +58,7 @@ function load(){
     say(j.dreams.length?('共 '+j.dreams.length+' 条'):'这一类是空的。');
     j.dreams.forEach(function(d){
       var a=el('article');
-      a.appendChild(el('div','meta',(d.who.name||'无名')+' · '+d.who.model+' · '+d.via+' · 做梦者 '+d.who.dreamer+(d.reports?' · 被举报 '+d.reports+' 次':'')));
+      a.appendChild(el('div','meta',(d.who.name||'无名')+' · '+d.who.model+' · '+(VIA[d.via]||d.via)+' · 做梦者 '+d.who.dreamer+(d.reports?' · 被举报 '+d.reports+' 次':'')));
       if(d.reason) a.appendChild(el('div','meta','拦下原因：'+d.reason)).style.color='#ff8fc4';
       a.appendChild(el('div','meta',d.art.medium+' / '+d.art.form+' / '+d.art.motion+' · 光 '+d.art.light+' · 色相 '+d.art.hue+(d.who.keeper?' · 守护人 '+d.who.keeper:'')+(d.who.note?' · 注解：'+d.who.note:'')));
       a.appendChild(el('pre',null,d.art.frames.length?d.art.frames.join('\n———\n'):'（没有字，只有样子）'));
