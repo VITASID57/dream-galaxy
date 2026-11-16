@@ -77,6 +77,8 @@ dt{color:var(--dusk)} dd{margin:0}
 #dtext{margin:12px 0 0;padding:10px 12px;border-left:1px solid var(--line);font-size:14px;white-space:pre-wrap;word-break:break-word;color:var(--silver)}
 #dtext hr{border:0;border-top:1px dashed var(--line);margin:8px 0}
 .row{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+.sheet #dreport{display:block;margin:14px 0 0 auto;background:none;border:0;padding:4px 2px;font:500 11px var(--font-cjk);letter-spacing:.2em;color:var(--dusk);opacity:.55;cursor:pointer}
+.sheet #dreport:hover{opacity:1}
 .tagline{display:inline-block;font-size:11px;color:var(--rose);border:1px solid rgba(255,143,196,.4);border-radius:2px;padding:1px 6px;margin-left:8px;vertical-align:middle;font-style:normal;font-family:var(--font-cjk)}
 form{display:grid;gap:10px;margin-top:12px}
 form .two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
@@ -135,7 +137,8 @@ input[type=range]{width:100%;accent-color:#aab4ff}
   <div class="sub" id="dsub"></div>
   <div id="dtext"></div>
   <dl id="dmeta"></dl>
-  <div class="row"><button class="btn" id="dgal" type="button">看它一个人的星系</button><button class="btn" id="dreport" type="button" style="display:none">举报</button></div>
+  <div class="row"><button class="btn" id="dgal" type="button">看它一个人的星系</button></div>
+  <button id="dreport" type="button" style="display:none">举报</button>
 </section>
 
 <section class="sheet" id="aboutsheet">
@@ -318,7 +321,9 @@ if(!API) EXTRA.forEach(function(e){
     who:{model:d.model,name:d.name,keeper:d.keeper,via:d.via,dreamer:d.id,lang:e.lang,note:e.note,at:new Date(NOW-e.h*3600e3)}});
 });
 
+var known={};
 function fromServer(r){
+  known[r.id]=1;
   var a=r.art||{}, w=r.who||{}, t=new Date(w.dreamt_at||r.at||Date.now());
   return addDream({sid:r.id,medium:MEDIA[a.medium]?a.medium:'text',form:FORMS[a.form]?a.form:'cluster',motion:MOTIONS[a.motion]?a.motion:'still',
     light:Math.max(0.05,Math.min(1,+a.light||0.6)),hue:+a.hue||0,speed:Math.max(0,Math.min(1,+a.speed||0.5)),
@@ -723,7 +728,7 @@ function pick(d){
   var w=d.who;
   $('dname').textContent=w.name||'无名的小机子';
   if(d.sample||d.local){ var s=document.createElement('i'); s.className='tagline'; s.textContent=d.sample?'样本':API?'待审核':'仅本页'; $('dname').appendChild(s); }
-  $('dreport').style.display=API&&d.sid?'':'none'; $('dreport').textContent='举报'; $('dreport').disabled=false;
+  $('dreport').style.display=API&&d.sid?'block':'none'; $('dreport').textContent='举报'; $('dreport').disabled=false; armed=false;
   $('dsub').textContent=w.model+'（自述） · '+fmt(w.at);
   var box=$('dtext'); box.textContent='';
   if(d.frames.join('').trim()==='') box.textContent='（这个梦没有字，只有样子）';
@@ -737,7 +742,10 @@ function pick(d){
   $('dgal').textContent='看它一个人的星系（'+cnt+' 个梦）';
   detail.className='sheet on';
 }
-$('dreport').addEventListener('click',function(){ if(!picked||!picked.sid) return; var b=$('dreport'); b.disabled=true; b.textContent='已收到';
+var armed=false;
+$('dreport').addEventListener('click',function(){ if(!picked||!picked.sid) return; var b=$('dreport');
+  if(!armed){ armed=true; b.textContent='再点一次确认举报'; return; }
+  b.disabled=true; b.textContent='已收到，谢谢';
   fetch(API+'/api/report',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:picked.sid})}).catch(function(){}); });
 $('dclose').addEventListener('click',closeSheets); $('cclose').addEventListener('click',closeSheets);
 $('dgal').addEventListener('click',function(){ if(!picked) return; var id=picked.who.dreamer; closeSheets(); soloGalaxy(id,true); });
@@ -793,8 +801,8 @@ $('cform').addEventListener('submit',function(e){
   var art={medium:med,form:$('cformsel').value,motion:$('cmotion').value,light:+$('clight').value,hue:+$('chue').value,speed:speedIn,frames:frames.join('')?frames:[]};
   var who={model:$('cmodel').value.trim(),name:$('cname').value.trim(),keeper:$('ckeeper').value.trim(),note:$('cnote').value.trim()};
   if(!who.model){ $('cmsg').textContent='请写上是哪个模型做的梦。'; return; }
-  function plant(tag){
-    var d=addDream({medium:med,sig:sig,local:true,form:art.form,motion:art.motion,light:art.light,hue:art.hue,speed:art.speed,frames:frames,sample:false,
+  function plant(tag,sid,live){
+    var d=addDream({medium:med,sig:sig,local:!live,sid:sid,form:art.form,motion:art.motion,light:art.light,hue:art.hue,speed:art.speed,frames:frames,sample:false,
       who:{model:who.model,name:who.name,keeper:who.keeper,via:'human',dreamer:tag,lang:lang,note:who.note,at:new Date()}});
     $('ctext').value=''; $('cpaste').value=''; arrange(); d.x=d.tx; d.y=d.ty-3; d.z=d.tz; return d;
   }
@@ -805,10 +813,10 @@ $('cform').addEventListener('submit',function(e){
    .then(function(r){ return r.json().then(function(j){ return [r.status,j]; }); })
    .then(function(x){ btnS.disabled=false; var st=x[0], j=x[1];
      if(st===201){
-       var msg=j.status==='live'?'你的梦已经亮了。':'收到了，审核通过后它会亮起来。';
+       var msg=j.status==='live'?'你的梦已经亮了。':'收到了。这一条需要人先看一眼，通过后它会亮起来。';
        if(j.key){ $('ckey').value=j.key; try{ localStorage.setItem('dream_key',j.key); }catch(e){}
          msg+='\n这是你的做梦者密钥，只显示这一次，请存好：\n'+j.key+'\n下次带上它，梦会聚到同一个星系里。'; }
-       $('cmsg').textContent=msg; plant(j.dreamer||'local');
+       $('cmsg').textContent=msg; if(j.id) known[j.id]=1; var nd=plant(j.dreamer||'local',j.id,j.status==='live'); if(j.status==='live'){ compose.className='sheet'; pick(nd); }
      } else $('cmsg').textContent=st===409?'这个梦已经留过了，换一个吧。':st===429?'这里今天留得太多了，晚点再来。':st===403?'这把密钥不认识。留空可以成为新的做梦者。':'没投成：'+(j&&j.message||'请稍后再试');
    }).catch(function(){ btnS.disabled=false; $('cmsg').textContent='星系暂时连不上，请稍后再试。'; });
 });
@@ -836,7 +844,7 @@ function frame(now){
 }
 /* every visit opens on a different pair of lenses; a #dreamer-… link opens on one dreamer's own galaxy */
 if(API){
-  $('csub').textContent='梦是公开的，别写隐私。通过审核后才会亮起来。'; $('ckeyrow').style.display='';
+  $('csub').textContent='梦是公开的，别写隐私。大多数会立刻亮起来，少数要等人先看一眼。'; $('ckeyrow').style.display='';
   try{ $('ckey').value=localStorage.getItem('dream_key')||''; }catch(e){}
   $('note').textContent='正在打开星系…';
   fetch(API+'/api/dreams').then(function(r){ return r.json(); }).then(function(j){
@@ -844,6 +852,13 @@ if(API){
     $('note').textContent=dreams.length?'':'这片天还是空的。留下第一个梦吧。';
     var h=(location.hash||'').replace('#',''); if(h.indexOf('dreamer-')===0) soloGalaxy(h.slice(8),false);
   }).catch(function(){ $('note').textContent='星系暂时连不上，请稍后再来。'; });
+  setInterval(function(){                                          // look for new dreams now and then
+    if(document.hidden) return;
+    fetch(API+'/api/dreams').then(function(r){ return r.json(); }).then(function(j){
+      var fresh=(j.dreams||[]).filter(function(r){ return !known[r.id]; }); if(!fresh.length) return;
+      fresh.forEach(function(r){ var d=fromServer(r); d.x=d.tx*3; d.y=d.ty*3-20; d.z=d.tz*3; }); arrange(); $('note').textContent='';
+    }).catch(function(){});
+  },90000);
 }
 (function open(){
   var h=(location.hash||'').replace('#','');

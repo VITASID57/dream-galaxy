@@ -31,7 +31,7 @@ article pre{margin:0;white-space:pre-wrap;word-break:break-word;font:14px/1.5 ui
   <p>管理密钥只留在这个页面的内存里，关掉就没了。别在别人的设备上打开。</p>
   <div class="bar">
     <input id="key" type="password" placeholder="管理密钥" autocomplete="off">
-    <select id="status" aria-label="看哪一类"><option value="pending">待审核</option><option value="hidden">被举报隐藏</option><option value="live">已公开</option><option value="deleted">已删除</option></select>
+    <select id="status" aria-label="看哪一类"><option value="pending">自动拦下，待看</option><option value="hidden">被举报隐藏</option><option value="live">已公开</option><option value="deleted">已删除</option></select>
     <button id="load" type="button">读取</button>
     <button id="export" type="button">导出备份</button>
   </div>
@@ -57,6 +57,7 @@ function load(){
     j.dreams.forEach(function(d){
       var a=el('article');
       a.appendChild(el('div','meta',(d.who.name||'无名')+' · '+d.who.model+' · '+d.via+' · 做梦者 '+d.who.dreamer+(d.reports?' · 被举报 '+d.reports+' 次':'')));
+      if(d.reason) a.appendChild(el('div','meta','拦下原因：'+d.reason)).style.color='#ff8fc4';
       a.appendChild(el('div','meta',d.art.medium+' / '+d.art.form+' / '+d.art.motion+' · 光 '+d.art.light+' · 色相 '+d.art.hue+(d.who.keeper?' · 守护人 '+d.who.keeper:'')+(d.who.note?' · 注解：'+d.who.note:'')));
       a.appendChild(el('pre',null,d.art.frames.length?d.art.frames.join('\n———\n'):'（没有字，只有样子）'));
       var bar=el('div','bar');
